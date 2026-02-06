@@ -6,11 +6,14 @@ import {
   calculateFretPositions,
   type ShapeName,
   type FretPosition,
+  type StringSet,
+  getMutedStringsForSet,
 } from '../utils/triadShapes'
 
 const props = defineProps<{
   chord: Chord | null
   shape: ShapeName | null
+  stringSet: StringSet
 }>()
 
 const containerRef = ref<HTMLElement | null>(null)
@@ -31,7 +34,8 @@ function renderShape() {
   const positions = calculateFretPositions(
     props.chord.root,
     props.chord.type,
-    props.shape
+    props.shape,
+    props.stringSet
   )
 
   const minFret = Math.min(...positions.map(p => p.fret))
@@ -43,8 +47,8 @@ function renderShape() {
 
   fretboard = new Fretboard({
     el: containerRef.value!,
-    stringCount: 3,
-    tuning: ['G3', 'B3', 'E4'],
+    stringCount: 6,
+    tuning: ['E4', 'B3', 'G3', 'D3', 'A2', 'E2'], // Full 6-string guitar
     fretCount: Math.max(maxFret - minFret + 2, 3),
     crop: true,
     fretLeftPadding: 1,
@@ -65,6 +69,12 @@ function renderShape() {
     nutColor: 'rgba(255,255,255,0.4)',
     dotTextSize: 13,
   })
+
+  // Mute strings not in the current set
+  const mutedStrings = getMutedStringsForSet(props.stringSet)
+  if (mutedStrings.length > 0) {
+    fretboard.muteStrings({ strings: mutedStrings })
+  }
 
   const dots = positions.map((p: FretPosition) => ({
     string: p.string,
@@ -95,7 +105,7 @@ onMounted(() => {
 })
 
 watch(
-  () => [props.chord, props.shape],
+  () => [props.chord, props.shape, props.stringSet],
   async () => {
     await nextTick()
     renderShape()
