@@ -1,26 +1,43 @@
-import { Chord as TonalChord } from 'tonal'
+import { Chord as TonalChord, Collection } from 'tonal'
+import type { StringSet } from './stringSetTypes'
 
 export type ShapeName = 'D' | 'A' | 'E'
+export type { StringSet }
 
 export interface TriadShape {
   name: ShapeName
-  rootString: number // 1=E, 2=B, 3=G
-  // Interval indices per string [str3, str2, str1], referencing chord.intervals
+  stringSet: StringSet
+  rootString: number // 1-6 on full 6-string guitar
+  // Interval indices per string [highest, middle, lowest], referencing chord.intervals
   intervalMap: [number, number, number]
+  tuning: [string, string, string] // The 3 strings used
 }
 
 export interface FretPosition {
-  string: number
+  string: number // 1-6 (1=high E, 6=low E)
   fret: number
   interval: string // tonal IntervalName e.g. '1P', '3M', '3m', '5P', '5d'
 }
 
+// String set configurations: tuning for each 3-string set
+const STRING_SET_TUNING: Record<StringSet, [string, string, string]> = {
+  'I': ['E4', 'B3', 'G3'],   // Strings 1, 2, 3
+  'II': ['B3', 'G3', 'D3'],  // Strings 2, 3, 4
+  'III': ['G3', 'D3', 'A2'], // Strings 3, 4, 5
+  'IV': ['D3', 'A2', 'E2'],  // Strings 4, 5, 6
+}
+
+// Generate shapes for all string sets
 // intervalMap: which chord interval (0=root, 1=third, 2=fifth) goes on each string
-const SHAPES: TriadShape[] = [
-  { name: 'D', rootString: 2, intervalMap: [2, 0, 1] }, // str3=5th, str2=Root, str1=3rd
-  { name: 'A', rootString: 3, intervalMap: [0, 1, 2] }, // str3=Root, str2=3rd, str1=5th
-  { name: 'E', rootString: 1, intervalMap: [1, 2, 0] }, // str3=3rd, str2=5th, str1=Root
-]
+const SHAPES: TriadShape[] = []
+for (const [setId, tuning] of Object.entries(STRING_SET_TUNING) as [StringSet, [string, string, string]][]) {
+  const baseString = setId === 'I' ? 1 : setId === 'II' ? 2 : setId === 'III' ? 3 : 4
+  SHAPES.push(
+    { name: 'D', stringSet: setId, rootString: baseString + 1, intervalMap: [2, 0, 1], tuning }, // middle=Root
+    { name: 'A', stringSet: setId, rootString: baseString + 2, intervalMap: [0, 1, 2], tuning }, // lowest=Root
+    { name: 'E', stringSet: setId, rootString: baseString, intervalMap: [1, 2, 0], tuning },     // highest=Root
+  )
+}
 
 const TRIAD_TYPE_MAP: Record<string, string> = {
   Major: 'major',
@@ -37,11 +54,14 @@ const INTERVAL_SEMITONES: Record<string, number> = {
   '5d': 6,
 }
 
-// Open string semitone values (top 3 strings, as MIDI-style absolute)
+// Open string semitone values for all 6 strings (1=high E, 6=low E)
 const OPEN_STRING_SEMITONE: Record<number, number> = {
-  3: 7,  // G
-  2: 11, // B
-  1: 4,  // E (high)
+  1: 4,  // E (high E4)
+  2: 11, // B (B3)
+  3: 7,  // G (G3)
+  4: 2,  // D (D3)
+  5: 9,  // A (A2)
+  6: 4,  // E (low E2)
 }
 
 function fretForSemitoneOnString(semitoneOffset: number, rootSemitone: number, stringNum: number): number {
@@ -52,22 +72,26 @@ function fretForSemitoneOnString(semitoneOffset: number, rootSemitone: number, s
 }
 
 /**
- * Calculate fret positions for a triad shape given root note and quality.
+ * Calculate fret positions for a triad shape given root note, quality, and string set.
  * Uses tonal to derive intervals (e.g. 1P, 3M, 3m, 5P, 5d) from chord type.
  */
 export function calculateFretPositions(
   rootNote: string,
   quality: 'Major' | 'Minor' | 'Dim',
-  shape: ShapeName
+  shape: ShapeName,
+  stringSet: StringSet
 ): FretPosition[] {
   const tonalType = TRIAD_TYPE_MAP[quality]
   const chordData = TonalChord.get(`${rootNote} ${tonalType}`)
   const intervals = chordData.intervals // e.g. ['1P', '3M', '5P']
 
-  const shapeData = SHAPES.find(s => s.name === shape)!
+  const shapeData = SHAPES.find(s => s.name === shape && s.stringSet === stringSet)!
   const rootSemitone = chordData.tonic ? (({ C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 } as Record<string, number>)[chordData.tonic[0]!] ?? 0) + (chordData.tonic.includes('#') ? 1 : chordData.tonic.includes('b') ? -1 : 0) : 0
 
-  const strings = [3, 2, 1] as const
+  // Map strings from highest to lowest pitch for this set
+  const baseString = stringSet === 'I' ? 1 : stringSet === 'II' ? 2 : stringSet === 'III' ? 3 : 4
+  const strings = [baseString, baseString + 1, baseString + 2] as const
+  
   const positions: FretPosition[] = strings.map((str, i) => {
     const intervalIdx = shapeData.intervalMap[i]!
     const intervalName = intervals[intervalIdx]!
@@ -91,11 +115,34 @@ export function calculateFretPositions(
   return positions
 }
 
-export function pickRandomShape(previousShape?: ShapeName): ShapeName {
+export function pickRandomShape(stringSet: StringSet, previousShape?: ShapeName): ShapeName {
+  const setShapes = SHAPES.filter(s => s.stringSet === stringSet)
   const candidates = previousShape
-    ? SHAPES.filter(s => s.name !== previousShape)
-    : SHAPES
-  return candidates[Math.floor(Math.random() * candidates.length)]!.name
+    ? setShapes.filter(s => s.name !== previousShape)
+    : setShapes
+  
+  // Use Tonal Collection.shuffle for randomization
+  const shuffled = Collection.shuffle(candidates.map(s => s.name))
+  return shuffled[0]!
 }
 
 export const SHAPE_NAMES: ShapeName[] = ['D', 'A', 'E']
+
+export function getTuningForStringSet(stringSet: StringSet): [string, string, string] {
+  return STRING_SET_TUNING[stringSet]
+}
+
+export function getMutedStringsForSet(stringSet: StringSet): number[] {
+  // Return strings that should be muted (strings not in the set)
+  const baseString = stringSet === 'I' ? 1 : stringSet === 'II' ? 2 : stringSet === 'III' ? 3 : 4
+  const usedStrings = [baseString, baseString + 1, baseString + 2]
+  const allStrings = [1, 2, 3, 4, 5, 6]
+  return allStrings.filter(s => !usedStrings.includes(s))
+}
+
+export function pickRandomStringSet(selectedSets: StringSet[]): StringSet {
+  if (selectedSets.length === 0) return 'I'
+  // Use Tonal Collection.shuffle for randomization
+  const shuffled = Collection.shuffle(selectedSets)
+  return shuffled[0]!
+}

@@ -8,6 +8,7 @@ import FretboardDiagram from "./components/FretboardDiagram.vue";
 import QualitySelector from "./components/QualitySelector.vue";
 import StartStopButton from "./components/StartStopButton.vue";
 import ThreeVisualizer from "./components/ThreeVisualizer.vue";
+import StringSetSelector from "./components/StringSetSelector.vue";
 import { useMetronome } from "./composables/useMetronome";
 import {
   generateRandomChord,
@@ -21,18 +22,21 @@ import {
   playMetronomeClick,
   fadeOutChord,
 } from "./utils/audio";
-import { pickRandomShape, type ShapeName } from "./utils/triadShapes";
+import { pickRandomShape, pickRandomStringSet, type ShapeName, type StringSet } from "./utils/triadShapes";
 import type { TriadType } from "./utils/notes";
 import { Scale } from "tonal";
 
 const selectedNotes = ref<string[]>(Scale.get("c chromatic").notes);
 const selectedTypes = ref<TriadType[]>(["Major", "Minor", "Dim"]);
+const selectedStringSets = ref<StringSet[]>(["I"]);
 const currentChord = ref<Chord | null>(null);
 const currentShape = ref<ShapeName | null>(null);
+const currentStringSet = ref<StringSet>("I");
 const instrumentReady = ref(false);
 // The chord that is currently displayed (preview for upcoming beat 4)
 const displayChord = ref<Chord | null>(null);
 const displayShape = ref<ShapeName | null>(null);
+const displayStringSet = ref<StringSet>("I");
 let isFirstBeat = false;
 
 onMounted(async () => {
@@ -57,6 +61,7 @@ function handleChordTrigger(shouldPlay: boolean) {
     if (displayChord.value) {
       currentChord.value = displayChord.value;
       currentShape.value = displayShape.value;
+      currentStringSet.value = displayStringSet.value;
       const noteNames = getChordNoteNames(currentChord.value);
       playChordSound(noteNames);
     }
@@ -72,7 +77,8 @@ function handleChordTrigger(shouldPlay: boolean) {
         currentChord.value ?? undefined,
         selectedTypes.value,
       );
-      displayShape.value = pickRandomShape(displayShape.value ?? undefined);
+      displayStringSet.value = pickRandomStringSet(selectedStringSets.value);
+      displayShape.value = pickRandomShape(displayStringSet.value, displayShape.value ?? undefined);
     } else {
       isFirstBeat = false;
     }
@@ -94,13 +100,14 @@ function toggleMetronome() {
     displayShape.value = null;
   } else {
     currentChord.value = null;
-    // Generate first chord+shape before countdown
+    // Generate first chord+shape+stringSet before countdown
     displayChord.value = generateRandomChord(
       selectedNotes.value,
       undefined,
       selectedTypes.value
     );
-    displayShape.value = pickRandomShape(undefined);
+    displayStringSet.value = pickRandomStringSet(selectedStringSets.value);
+    displayShape.value = pickRandomShape(displayStringSet.value, undefined);
     isFirstBeat = true;
     start();
   }
@@ -124,6 +131,10 @@ function toggleMetronome() {
       <QualitySelector v-model="selectedTypes" />
     </div>
 
+    <div class="controls-section">
+      <StringSetSelector v-model="selectedStringSets" />
+    </div>
+
     <div class="controls-row">
       <TempoSlider v-model="bpm" />
     </div>
@@ -133,7 +144,7 @@ function toggleMetronome() {
       <template v-else>
         <div class="chord-and-fretboard">
           <ChordDisplay :chord="displayChord" />
-          <FretboardDiagram :chord="displayChord" :shape="displayShape" />
+          <FretboardDiagram :chord="displayChord" :shape="displayShape" :string-set="displayStringSet" />
         </div>
       </template>
       <BeatDisplay :current-beat="currentBeat" />
