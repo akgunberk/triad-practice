@@ -149,28 +149,37 @@ export function getFrequencyData(): FrequencyData {
 
 export function playMetronomeClick(isBeat1: boolean): void {
   const ctx = ensureAudioContext()
-  
-  // Create oscillator and gain for the click
-  const osc = ctx.createOscillator()
+
+  // Short noise burst → bandpass filter → fast envelope = wood block tick
+  const bufferSize = Math.floor(ctx.sampleRate * 0.04) // 40ms of noise
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
+  const data = buffer.getChannelData(0)
+  for (let i = 0; i < bufferSize; i++) {
+    data[i] = Math.random() * 2 - 1
+  }
+
+  const source = ctx.createBufferSource()
+  source.buffer = buffer
+
+  // Bandpass filter gives it a woody, tonal click character
+  const filter = ctx.createBiquadFilter()
+  filter.type = 'bandpass'
+  filter.frequency.value = isBeat1 ? 3500 : 2500
+  filter.Q.value = isBeat1 ? 2.0 : 1.5
+
   const clickGain = ctx.createGain()
-  
-  // Higher pitch for beat 1, lower for other beats
-  osc.frequency.value = isBeat1 ? 800 : 600
-  osc.type = 'sine'
-  
-  // Connect to analyser so visualizer reacts
-  clickGain.connect(analyser!)
-  osc.connect(clickGain)
-  
-  // Duration: 100ms for beat 1, 80ms for others
-  const durationMs = isBeat1 ? 100 : 80
-  const durationSec = durationMs / 1000
-  
-  // Envelope: quick attack, exponential decay
   const now = ctx.currentTime
-  clickGain.gain.setValueAtTime(0.3, now)
-  clickGain.gain.exponentialRampToValueAtTime(0.01, now + durationSec)
-  
-  osc.start(now)
-  osc.stop(now + durationSec)
+  const peak = isBeat1 ? 0.18 : 0.12
+  const decay = isBeat1 ? 0.035 : 0.025
+
+  // Ultra-fast envelope: snap attack, quick exponential decay
+  clickGain.gain.setValueAtTime(peak, now)
+  clickGain.gain.exponentialRampToValueAtTime(0.001, now + decay)
+
+  source.connect(filter)
+  filter.connect(clickGain)
+  clickGain.connect(analyser!)
+
+  source.start(now)
+  source.stop(now + decay)
 }

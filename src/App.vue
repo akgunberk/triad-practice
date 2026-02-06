@@ -201,8 +201,11 @@ function toggleMetronome() {
     @toggle="toggleMetronome" />
 
   <div class="app-container">
-    <h1 class="app-title">Cerberus</h1>
-    <h2 class="app-subtitle">Your Relentless Triad Practice Beast</h2>
+    <h1 class="app-title">
+      Cerberus
+      <br />
+      Your Relentless Triad Practice Beast
+    </h1>
 
     <div class="main-display">
       <div v-if="countdown > 0" class="countdown">{{ countdown }}</div>

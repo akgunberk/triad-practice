@@ -134,7 +134,7 @@ watch(
   background: rgba(10, 10, 18, 0.75);
   backdrop-filter: blur(8px);
   border-radius: 16px;
-  padding: 16px 20px;
+  padding: 12px 20px 0;
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
@@ -148,7 +148,7 @@ watch(
 
 .fretboard-container {
   min-width: 320px;
-  min-height: 240px;
+  /* min-height: 240px; */
 }
 
 .fretboard-container :deep(svg) {
