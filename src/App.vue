@@ -42,7 +42,7 @@ import {
   type CircleDirection,
 } from "./utils/circleOfFifths";
 
-const selectedNotes = ref<string[]>(Scale.get("c chromatic").notes);
+const selectedNotes = ref<string[]>(Scale.get("c chromatic").notes.slice(0, 1));
 const selectedTypes = ref<TriadType[]>(["Major", "Minor", "Dim"]);
 const selectedStringSets = ref<StringSet[]>(["I"]);
 const progressionMode = ref<ProgressionMode>("random");
@@ -157,9 +157,6 @@ function toggleMetronome() {
   if (isRunning.value) {
     stop();
     stopChordSound();
-    currentShape.value = null;
-    displayChord.value = null;
-    displayShape.value = null;
   } else {
     currentChord.value = null;
     progressionIndex.value = 0;
