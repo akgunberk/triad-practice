@@ -87,7 +87,7 @@ onMounted(async () => {
   instrumentReady.value = true;
 });
 
-function handleBeat(_beat: number) {}
+function handleBeat(_beat: number) { }
 
 function handleMetronomeClick(isBeat1: boolean) {
   playMetronomeClick(isBeat1);
@@ -186,35 +186,30 @@ function toggleMetronome() {
 </script>
 
 <template>
-  <ThreeVisualizer :is-running="isRunning" :current-beat="currentBeat" />
+  <ThreeVisualizer :is-running="isRunning" :current-beat="currentBeat" :chord="displayChord" />
 
-  <AppSidebar
-    v-model:app-mode="appMode"
-    v-model:circle-direction="circleDirection"
-    v-model:progression-type="progressionType"
-    v-model:progression-key="progressionKey"
-    v-model:selected-notes="selectedNotes"
-    v-model:selected-types="selectedTypes"
-    v-model:selected-string-sets="selectedStringSets"
-    v-model:bpm="bpm"
-    :is-running="isRunning"
-    :can-start="canStart"
-    @toggle="toggleMetronome"
-  />
+  <!-- Quick play/pause button — top right -->
+  <button class="play-pause-btn" :disabled="!canStart" @click="toggleMetronome"
+    :aria-label="isRunning ? 'Pause' : 'Play'">
+    {{ isRunning ? "⏸" : "▶" }}
+  </button>
+
+  <AppSidebar v-model:app-mode="appMode" v-model:circle-direction="circleDirection"
+    v-model:progression-type="progressionType" v-model:progression-key="progressionKey"
+    v-model:selected-notes="selectedNotes" v-model:selected-types="selectedTypes"
+    v-model:selected-string-sets="selectedStringSets" v-model:bpm="bpm" :is-running="isRunning" :can-start="canStart"
+    @toggle="toggleMetronome" />
 
   <div class="app-container">
-    <h1 class="app-title">Chord Practicer</h1>
+    <h1 class="app-title">Cerberus</h1>
+    <h2 class="app-subtitle">Your Relentless Triad Practice Beast</h2>
 
     <div class="main-display">
       <div v-if="countdown > 0" class="countdown">{{ countdown }}</div>
       <template v-else>
         <div class="chord-and-fretboard">
           <ChordDisplay :chord="displayChord" />
-          <FretboardDiagram
-            :chord="displayChord"
-            :shape="displayShape"
-            :string-set="displayStringSet"
-          />
+          <FretboardDiagram :chord="displayChord" :shape="displayShape" :string-set="displayStringSet" />
         </div>
       </template>
       <BeatDisplay :current-beat="currentBeat" />
@@ -223,6 +218,38 @@ function toggleMetronome() {
 </template>
 
 <style scoped>
+.play-pause-btn {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 100;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(15, 15, 21, 0.7);
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  color: rgba(255, 255, 255, 0.85);
+  transition: all 0.2s ease;
+  padding: 0;
+  line-height: 1;
+}
+
+.play-pause-btn:hover:not(:disabled) {
+  background: rgba(100, 108, 255, 0.15);
+  border-color: rgba(100, 108, 255, 0.4);
+}
+
+.play-pause-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 .app-container {
   position: relative;
   z-index: 1;

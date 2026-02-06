@@ -55,11 +55,11 @@ function renderShape() {
     crop: true,
     fretLeftPadding: 1,
     showFretNumbers: true,
-    dotSize: 28,
+    dotSize: 32,
     dotStrokeWidth: 2,
     dotStrokeColor: "transparent",
-    width: 260,
-    height: 200,
+    width: 320,
+    height: 240,
     font: "inherit",
     topPadding: 20,
     bottomPadding: 15,
@@ -131,6 +131,11 @@ watch(
   align-items: center;
   gap: 8px;
   pointer-events: none;
+  background: rgba(10, 10, 18, 0.75);
+  backdrop-filter: blur(8px);
+  border-radius: 16px;
+  padding: 16px 20px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .shape-label {
@@ -142,8 +147,8 @@ watch(
 }
 
 .fretboard-container {
-  min-width: 260px;
-  min-height: 200px;
+  min-width: 320px;
+  min-height: 240px;
 }
 
 .fretboard-container :deep(svg) {

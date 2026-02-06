@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
-import { init, dispose, onResize, triggerBeat } from '../utils/visualizer'
+import { init, dispose, onResize, triggerBeat, setColor } from '../utils/visualizer'
+import type { Chord } from '../utils/chordGenerator'
+import { getNoteColor } from '../utils/notes'
 
 const props = defineProps<{
   isRunning: boolean
   currentBeat: number
+  chord: Chord | null
 }>()
 
 const container = ref<HTMLElement | null>(null)
@@ -14,6 +17,15 @@ watch(
   (beat) => {
     if (beat === 1 && props.isRunning) {
       triggerBeat()
+    }
+  }
+)
+
+watch(
+  () => props.chord,
+  (chord) => {
+    if (chord) {
+      setColor(getNoteColor(chord.root))
     }
   }
 )
