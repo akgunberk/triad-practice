@@ -12,10 +12,12 @@ const TRIAD_TYPE_MAP: Record<TriadType, string> = {
   Dim: 'diminished',
 }
 
-export function generateRandomChord(selectedNotes: string[], previousChord?: Chord): Chord {
+export function generateRandomChord(selectedNotes: string[], previousChord?: Chord, selectedTypes?: TriadType[]): Chord {
   if (selectedNotes.length === 0) {
     throw new Error('No notes selected')
   }
+
+  const types = selectedTypes && selectedTypes.length > 0 ? selectedTypes : TRIAD_TYPES
 
   let root: string
   if (selectedNotes.length === 1) {
@@ -28,7 +30,7 @@ export function generateRandomChord(selectedNotes: string[], previousChord?: Cho
     root = candidates[Math.floor(Math.random() * candidates.length)]!
   }
 
-  const type = TRIAD_TYPES[Math.floor(Math.random() * TRIAD_TYPES.length)]!
+  const type = types[Math.floor(Math.random() * types.length)]!
 
   return { root, type }
 }

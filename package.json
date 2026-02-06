@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@moonwave99/fretboard.js": "^0.2.13",
     "smplr": "^0.16.4",
     "three": "^0.182.0",
     "tonal": "^6.4.3",

@@ -1,24 +1,44 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import NoteSelector from './components/NoteSelector.vue'
-import TempoSlider from './components/TempoSlider.vue'
-import BeatDisplay from './components/BeatDisplay.vue'
-import ChordDisplay from './components/ChordDisplay.vue'
-import StartStopButton from './components/StartStopButton.vue'
-import ThreeVisualizer from './components/ThreeVisualizer.vue'
-import InstrumentPicker from './components/InstrumentPicker.vue'
-import { useMetronome } from './composables/useMetronome'
-import { generateRandomChord, getChordNoteNames, type Chord } from './utils/chordGenerator'
-import { initInstrument, playChordSound, stopChordSound, playMetronomeClick, fadeOutChord } from './utils/audio'
+import { ref, onMounted } from "vue";
+import NoteSelector from "./components/NoteSelector.vue";
+import TempoSlider from "./components/TempoSlider.vue";
+import BeatDisplay from "./components/BeatDisplay.vue";
+import ChordDisplay from "./components/ChordDisplay.vue";
+import FretboardDiagram from "./components/FretboardDiagram.vue";
+import QualitySelector from "./components/QualitySelector.vue";
+import StartStopButton from "./components/StartStopButton.vue";
+import ThreeVisualizer from "./components/ThreeVisualizer.vue";
+import { useMetronome } from "./composables/useMetronome";
+import {
+  generateRandomChord,
+  getChordNoteNames,
+  type Chord,
+} from "./utils/chordGenerator";
+import {
+  initInstrument,
+  playChordSound,
+  stopChordSound,
+  playMetronomeClick,
+  fadeOutChord,
+} from "./utils/audio";
+import { pickRandomShape, type ShapeName } from "./utils/triadShapes";
+import type { TriadType } from "./utils/notes";
+import { Scale } from "tonal";
 
-const selectedNotes = ref<string[]>([])
-const currentChord = ref<Chord | null>(null)
-const instrumentReady = ref(false)
+const selectedNotes = ref<string[]>(Scale.get("c chromatic").notes);
+const selectedTypes = ref<TriadType[]>(["Major", "Minor", "Dim"]);
+const currentChord = ref<Chord | null>(null);
+const currentShape = ref<ShapeName | null>(null);
+const instrumentReady = ref(false);
+// The chord that is currently displayed (preview for upcoming beat 4)
+const displayChord = ref<Chord | null>(null);
+const displayShape = ref<ShapeName | null>(null);
+let isFirstBeat = false;
 
 onMounted(async () => {
-  await initInstrument()
-  instrumentReady.value = true
-})
+  await initInstrument();
+  instrumentReady.value = true;
+});
 
 function handleBeat(_beat: number) {
   // Display beat (handled by BeatDisplay component)
@@ -26,40 +46,63 @@ function handleBeat(_beat: number) {
 
 function handleMetronomeClick(isBeat1: boolean) {
   // Play metronome click sound
-  playMetronomeClick(isBeat1)
+  playMetronomeClick(isBeat1);
 }
 
 function handleChordTrigger(shouldPlay: boolean) {
-  if (selectedNotes.value.length === 0) return
+  if (selectedNotes.value.length === 0) return;
 
   if (shouldPlay) {
-    // Beat 4: play new chord
-    currentChord.value = generateRandomChord(
-      selectedNotes.value,
-      currentChord.value ?? undefined
-    )
-    const noteNames = getChordNoteNames(currentChord.value)
-    playChordSound(noteNames)
+    // Beat 4: play audio for the already-displayed chord
+    if (displayChord.value) {
+      currentChord.value = displayChord.value;
+      currentShape.value = displayShape.value;
+      const noteNames = getChordNoteNames(currentChord.value);
+      playChordSound(noteNames);
+    }
   } else {
-    // Beat 1: fade out current chord over 1 beat duration
-    const beatInterval = 60000 / bpm.value
-    fadeOutChord(beatInterval)
+    // Beat 1: fade out previous audio
+    const beatInterval = 60000 / bpm.value;
+    fadeOutChord(beatInterval);
+
+    // Only generate new chord on beat 1 if NOT the first beat
+    if (!isFirstBeat) {
+      displayChord.value = generateRandomChord(
+        selectedNotes.value,
+        currentChord.value ?? undefined,
+        selectedTypes.value,
+      );
+      displayShape.value = pickRandomShape(displayShape.value ?? undefined);
+    } else {
+      isFirstBeat = false;
+    }
   }
 }
 
 const { bpm, currentBeat, isRunning, countdown, start, stop } = useMetronome(
   handleBeat,
   handleMetronomeClick,
-  handleChordTrigger
-)
+  handleChordTrigger,
+);
 
 function toggleMetronome() {
   if (isRunning.value) {
-    stop()
-    stopChordSound()
+    stop();
+    stopChordSound();
+    currentShape.value = null;
+    displayChord.value = null;
+    displayShape.value = null;
   } else {
-    currentChord.value = null
-    start()
+    currentChord.value = null;
+    // Generate first chord+shape before countdown
+    displayChord.value = generateRandomChord(
+      selectedNotes.value,
+      undefined,
+      selectedTypes.value
+    );
+    displayShape.value = pickRandomShape(undefined);
+    isFirstBeat = true;
+    start();
   }
 }
 </script>
@@ -68,29 +111,37 @@ function toggleMetronome() {
   <ThreeVisualizer :is-running="isRunning" :current-beat="currentBeat" />
   <div class="app-container">
     <h1 class="app-title">Chord Practicer</h1>
-    <p class="app-subtitle">Select the notes you want to practice — random triads will be shown on each beat.</p>
+    <p class="app-subtitle">
+      Select the notes you want to practice — random triads will be shown on
+      each beat.
+    </p>
 
     <div class="controls-section">
       <NoteSelector v-model="selectedNotes" />
     </div>
 
+    <div class="controls-section">
+      <QualitySelector v-model="selectedTypes" />
+    </div>
+
     <div class="controls-row">
       <TempoSlider v-model="bpm" />
-      <InstrumentPicker />
     </div>
 
     <div class="main-display">
       <div v-if="countdown > 0" class="countdown">{{ countdown }}</div>
-      <ChordDisplay v-else :chord="currentChord" />
+      <template v-else>
+        <div class="chord-and-fretboard">
+          <ChordDisplay :chord="displayChord" />
+          <FretboardDiagram :chord="displayChord" :shape="displayShape" />
+        </div>
+      </template>
       <BeatDisplay :current-beat="currentBeat" />
     </div>
 
     <div class="controls-section">
-      <StartStopButton
-        :is-running="isRunning"
-        :disabled="selectedNotes.length === 0 || !instrumentReady"
-        @toggle="toggleMetronome"
-      />
+      <StartStopButton :is-running="isRunning" :disabled="selectedNotes.length === 0 || !instrumentReady"
+        @toggle="toggleMetronome" />
     </div>
   </div>
 </template>
@@ -102,8 +153,8 @@ function toggleMetronome() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 20px;
-  padding: 24px 16px;
+  gap: 12px;
+  padding: 16px 16px;
   height: 100vh;
   box-sizing: border-box;
   overflow: hidden;
@@ -150,6 +201,13 @@ function toggleMetronome() {
   min-height: 0;
 }
 
+.chord-and-fretboard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
 .countdown {
   font-size: clamp(5rem, 15vw, 10rem);
   font-weight: 900;
@@ -164,6 +222,7 @@ function toggleMetronome() {
     opacity: 0;
     transform: scale(1.6);
   }
+
   100% {
     opacity: 1;
     transform: scale(1);

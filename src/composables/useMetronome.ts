@@ -3,9 +3,9 @@ import { ref, watch, onUnmounted } from "vue";
 export function useMetronome(
   onBeat: (beat: number) => void,
   onMetronomeClick?: (isBeat1: boolean) => void,
-  onChordTrigger?: (shouldPlay: boolean) => void
+  onChordTrigger?: (shouldPlay: boolean) => void,
 ) {
-  const bpm = ref(60);
+  const bpm = ref(40);
   const currentBeat = ref(0); // 0 = not started, 1-4 = active beats
   const isRunning = ref(false);
   const countdown = ref(0); // 3, 2, 1, 0 = go

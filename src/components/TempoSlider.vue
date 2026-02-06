@@ -11,14 +11,14 @@ const bpm = defineModel<number>({ required: true })
     <input
       type="range"
       :min="40"
-      :max="240"
+      :max="120"
       :value="bpm"
       class="slider"
       @input="bpm = Number(($event.target as HTMLInputElement).value)"
     />
     <div class="tempo-range">
       <span>40</span>
-      <span>240</span>
+      <span>120</span>
     </div>
   </div>
 </template>

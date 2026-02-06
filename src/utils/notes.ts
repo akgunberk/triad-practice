@@ -1,27 +1,36 @@
+import { Scale } from "tonal";
+
 export interface Note {
-  name: string
-  color: string
+  name: string;
+  color: string;
 }
 
-export const NOTES: Note[] = [
-  { name: 'C', color: '#FF6B6B' },
-  { name: 'C#', color: '#FF8E53' },
-  { name: 'D', color: '#FFC145' },
-  { name: 'D#', color: '#FFE66D' },
-  { name: 'E', color: '#88D8B0' },
-  { name: 'F', color: '#6BCB77' },
-  { name: 'F#', color: '#4ECDC4' },
-  { name: 'G', color: '#45B7D1' },
-  { name: 'G#', color: '#7C83FD' },
-  { name: 'A', color: '#B388FF' },
-  { name: 'A#', color: '#F78FB3' },
-  { name: 'B', color: '#E056A0' },
-]
+const COLOR_PALETTE = [
+  "#FF6B6B",
+  "#FF8E53",
+  "#FFC145",
+  "#FFE66D",
+  "#88D8B0",
+  "#6BCB77",
+  "#4ECDC4",
+  "#45B7D1",
+  "#7C83FD",
+  "#B388FF",
+  "#F78FB3",
+  "#E056A0",
+];
 
-export type TriadType = 'Major' | 'Minor' | 'Dim'
+export const CHROMATIC_SCALE = Scale.get("c chromatic").notes;
 
-export const TRIAD_TYPES: TriadType[] = ['Major', 'Minor', 'Dim']
+export const NOTES: Note[] = CHROMATIC_SCALE.map((name, idx) => ({
+  name,
+  color: COLOR_PALETTE[idx]!,
+}));
+
+export type TriadType = "Major" | "Minor" | "Dim";
+
+export const TRIAD_TYPES: TriadType[] = ["Major", "Minor", "Dim"];
 
 export function getNoteColor(noteName: string): string {
-  return NOTES.find((n) => n.name === noteName)?.color ?? '#ffffff'
+  return NOTES.find((n) => n.name === noteName)?.color ?? "#ffffff";
 }

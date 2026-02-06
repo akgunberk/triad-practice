@@ -63,10 +63,11 @@ export function init(container: HTMLElement) {
     color: 0xaa66ff,
     wireframe: true,
     transparent: true,
-    opacity: 0.25,
+    opacity: 0,
   })
   ballWire = new THREE.Mesh(wireGeo, wireMat)
   ballWire.position.set(0, 0, 0)
+  ballWire.visible = false
   group.add(ballWire)
 
   // Wireframe planes
