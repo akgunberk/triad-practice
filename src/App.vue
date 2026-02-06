@@ -8,7 +8,6 @@ import FretboardDiagram from "./components/FretboardDiagram.vue";
 import QualitySelector from "./components/QualitySelector.vue";
 import StartStopButton from "./components/StartStopButton.vue";
 import ThreeVisualizer from "./components/ThreeVisualizer.vue";
-import TriadCheatsheet from "./components/TriadCheatsheet.vue";
 import StringSetSelector from "./components/StringSetSelector.vue";
 import CircleModeSelector from "./components/CircleModeSelector.vue";
 import ProgressionSelector from "./components/ProgressionSelector.vue";
@@ -29,7 +28,12 @@ import {
   playMetronomeClick,
   fadeOutChord,
 } from "./utils/audio";
-import { pickRandomShape, pickRandomStringSet, type ShapeName, type StringSet } from "./utils/triadShapes";
+import {
+  pickRandomShape,
+  pickRandomStringSet,
+  type ShapeName,
+  type StringSet,
+} from "./utils/triadShapes";
 import type { TriadType } from "./utils/notes";
 import { Scale } from "tonal";
 import {
@@ -58,7 +62,7 @@ let isFirstBeat = false;
 const isCircleMode = ref(false);
 const circleDirection = ref<CircleDirection>("right");
 const circleProgression = computed(() =>
-  getCircleOfFifthsProgression(circleDirection.value, selectedTypes.value)
+  getCircleOfFifthsProgression(circleDirection.value, selectedTypes.value),
 );
 
 // Reset circle progression when direction or types change
@@ -86,7 +90,12 @@ function handleMetronomeClick(isBeat1: boolean) {
 }
 
 function handleChordTrigger(shouldPlay: boolean) {
-  if (!isCircleMode.value && !isProgressionMode.value && selectedNotes.value.length === 0) return;
+  if (
+    !isCircleMode.value &&
+    !isProgressionMode.value &&
+    selectedNotes.value.length === 0
+  )
+    return;
 
   if (shouldPlay) {
     // Beat 4: play audio for the already-displayed chord
@@ -108,7 +117,7 @@ function handleChordTrigger(shouldPlay: boolean) {
         // Circle mode: get next chord in progression
         displayChord.value = getNextChordInCircle(
           displayChord.value ?? undefined,
-          circleProgression.value
+          circleProgression.value,
         );
       } else if (isProgressionMode.value) {
         // Progression mode: get next chord in progression
@@ -124,11 +133,14 @@ function handleChordTrigger(shouldPlay: boolean) {
         displayChord.value = generateRandomChord(
           selectedNotes.value,
           currentChord.value ?? undefined,
-          selectedTypes.value
+          selectedTypes.value,
         );
       }
       displayStringSet.value = pickRandomStringSet(selectedStringSets.value);
-      displayShape.value = pickRandomShape(displayStringSet.value, displayShape.value ?? undefined);
+      displayShape.value = pickRandomShape(
+        displayStringSet.value,
+        displayShape.value ?? undefined,
+      );
     } else {
       isFirstBeat = false;
     }
@@ -156,7 +168,7 @@ function toggleMetronome() {
       // Circle mode: start from the first chord in progression
       displayChord.value = getNextChordInCircle(
         undefined,
-        circleProgression.value
+        circleProgression.value,
       );
     } else if (isProgressionMode.value) {
       const progressionState: ProgressionState = {
@@ -170,7 +182,7 @@ function toggleMetronome() {
       displayChord.value = generateRandomChord(
         selectedNotes.value,
         undefined,
-        selectedTypes.value
+        selectedTypes.value,
       );
     }
     displayStringSet.value = pickRandomStringSet(selectedStringSets.value);
@@ -183,7 +195,8 @@ function toggleMetronome() {
 
 <template>
   <ThreeVisualizer :is-running="isRunning" :current-beat="currentBeat" />
-  <TriadCheatsheet :selected-types="selectedTypes" />
+
+  <!-- <TriadCheatsheet  :selected-types="selectedTypes" /> -->
   <div class="app-container">
     <h1 class="app-title">Chord Practicer</h1>
     <p class="app-subtitle">
@@ -192,8 +205,8 @@ function toggleMetronome() {
     </p>
 
     <div class="controls-section">
-      <CircleModeSelector 
-        v-model:circle-mode="isCircleMode" 
+      <CircleModeSelector
+        v-model:circle-mode="isCircleMode"
         v-model:direction="circleDirection"
       />
     </div>
@@ -227,7 +240,11 @@ function toggleMetronome() {
       <template v-else>
         <div class="chord-and-fretboard">
           <ChordDisplay :chord="displayChord" />
-          <FretboardDiagram :chord="displayChord" :shape="displayShape" :string-set="displayStringSet" />
+          <FretboardDiagram
+            :chord="displayChord"
+            :shape="displayShape"
+            :string-set="displayStringSet"
+          />
         </div>
       </template>
       <BeatDisplay :current-beat="currentBeat" />
@@ -237,7 +254,8 @@ function toggleMetronome() {
       <StartStopButton
         :is-running="isRunning"
         :disabled="
-          (!isCircleMode && !isProgressionMode && selectedNotes.length === 0) || !instrumentReady
+          (!isCircleMode && !isProgressionMode && selectedNotes.length === 0) ||
+          !instrumentReady
         "
         @toggle="toggleMetronome"
       />
@@ -257,7 +275,7 @@ function toggleMetronome() {
   padding-right: 256px;
   height: 100vh;
   box-sizing: border-box;
-  overflow: hidden;
+  /* overflow: hidden; */
 }
 
 .app-title {

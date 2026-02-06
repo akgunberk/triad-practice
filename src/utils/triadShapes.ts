@@ -45,13 +45,33 @@ const TRIAD_TYPE_MAP: Record<string, string> = {
   Dim: 'diminished',
 }
 
-// Semitone offsets for tonal intervals used in triads
-const INTERVAL_SEMITONES: Record<string, number> = {
-  '1P': 0,
-  '3M': 4,
-  '3m': 3,
-  '5P': 7,
-  '5d': 6,
+// Shape patterns: fret offsets [string1, string2, string3] relative to root position
+// For Set I (strings 1,2,3): E shape root on string 1, D shape root on string 2, A shape root on string 3
+type ShapePattern = [number, number, number]
+
+const SHAPE_PATTERNS: Record<ShapeName, Record<'Major' | 'Minor' | 'Dim', ShapePattern>> = {
+  E: {
+    Major: [1, 0, 0],   // E shape: root on string 1
+    Minor: [1, -1, 0],  // 3rd down 1 semitone
+    Dim: [0, -1, 0],    // 3rd down 1, 5th down 1
+  },
+  A: {
+    Major: [2, 2, 0],   // A shape: root on string 3
+    Minor: [1, 2, 0],   // 3rd down 1 semitone
+    Dim: [1, 1, 0],     // 3rd down 1, 5th down 1
+  },
+  D: {
+    Major: [-1, 0, -1], // D shape: root on string 2
+    Minor: [-1, 0, 0],  // 3rd up 1 semitone
+    Dim: [-2, 0, 0],    // 3rd up 1, 5th down 1
+  },
+}
+
+// Which string has the root for each shape (for Set I)
+const SHAPE_ROOT_STRING: Record<ShapeName, number> = {
+  E: 1, // Root on E string
+  D: 2, // Root on B string
+  A: 3, // Root on G string
 }
 
 // Open string semitone values for all 6 strings (1=high E, 6=low E)
@@ -64,16 +84,27 @@ const OPEN_STRING_SEMITONE: Record<number, number> = {
   6: 4,  // E (low E2)
 }
 
-function fretForSemitoneOnString(semitoneOffset: number, rootSemitone: number, stringNum: number): number {
-  const target = (rootSemitone + semitoneOffset) % 12
-  const open = OPEN_STRING_SEMITONE[stringNum]!
-  const fret = ((target - open) % 12 + 12) % 12
-  return fret === 0 ? 12 : fret
+// Calculate which fret on a given string produces a specific note
+function getFretForNote(noteName: string, stringNum: number): number {
+  const noteMap: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }
+  const baseNote = noteName[0]!.toUpperCase()
+  let semitone = noteMap[baseNote] ?? 0
+  
+  if (noteName.includes('#')) semitone += 1
+  if (noteName.includes('b')) semitone -= 1
+  
+  const openStringSemitone = OPEN_STRING_SEMITONE[stringNum]!
+  let fret = ((semitone - openStringSemitone) % 12 + 12) % 12
+  
+  // Prefer lower frets when possible
+  if (fret === 0) fret = 12
+  
+  return fret
 }
 
 /**
- * Calculate fret positions for a triad shape given root note, quality, and string set.
- * Uses tonal to derive intervals (e.g. 1P, 3M, 3m, 5P, 5d) from chord type.
+ * Calculate fret positions for a triad shape using pattern-based approach.
+ * Shapes are pre-defined patterns that guarantee 4-fret span.
  */
 export function calculateFretPositions(
   rootNote: string,
@@ -81,36 +112,42 @@ export function calculateFretPositions(
   shape: ShapeName,
   stringSet: StringSet
 ): FretPosition[] {
+  // Get the pattern for this shape and quality
+  const pattern = SHAPE_PATTERNS[shape][quality]
+  
+  // Determine which string has the root based on shape and string set
+  const baseString = stringSet === 'I' ? 1 : stringSet === 'II' ? 2 : stringSet === 'III' ? 3 : 4
+  const rootStringOffset = SHAPE_ROOT_STRING[shape] - 1 // 0, 1, or 2
+  const rootString = baseString + rootStringOffset
+  
+  // Find the root note's fret on the root string
+  const rootFret = getFretForNote(rootNote, rootString)
+  
+  // Apply pattern offsets to get all three positions
+  const strings = [baseString, baseString + 1, baseString + 2]
+  const positions: FretPosition[] = strings.map((str, i) => ({
+    string: str,
+    fret: rootFret + pattern[i]!,
+    interval: '' // We'll fill this in next
+  }))
+  
+  // If any fret is < 1, shift all positions up by 12 (one octave)
+  if (positions.some(p => p.fret < 1)) {
+    for (const p of positions) {
+      p.fret += 12
+    }
+  }
+  
+  // Assign intervals based on shape and quality using Tonal
   const tonalType = TRIAD_TYPE_MAP[quality]
   const chordData = TonalChord.get(`${rootNote} ${tonalType}`)
   const intervals = chordData.intervals // e.g. ['1P', '3M', '5P']
-
-  const shapeData = SHAPES.find(s => s.name === shape && s.stringSet === stringSet)!
-  const rootSemitone = chordData.tonic ? (({ C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 } as Record<string, number>)[chordData.tonic[0]!] ?? 0) + (chordData.tonic.includes('#') ? 1 : chordData.tonic.includes('b') ? -1 : 0) : 0
-
-  // Map strings from highest to lowest pitch for this set
-  const baseString = stringSet === 'I' ? 1 : stringSet === 'II' ? 2 : stringSet === 'III' ? 3 : 4
-  const strings = [baseString, baseString + 1, baseString + 2] as const
   
-  const positions: FretPosition[] = strings.map((str, i) => {
+  const shapeData = SHAPES.find(s => s.name === shape && s.stringSet === stringSet)!
+  positions.forEach((pos, i) => {
     const intervalIdx = shapeData.intervalMap[i]!
-    const intervalName = intervals[intervalIdx]!
-    const semitoneOffset = INTERVAL_SEMITONES[intervalName] ?? 0
-    const fret = fretForSemitoneOnString(semitoneOffset, rootSemitone, str)
-    return { string: str, fret, interval: intervalName }
+    pos.interval = intervals[intervalIdx]!
   })
-
-  // Ensure all frets are close together (within one octave position)
-  const rootFret = positions.find(p => p.interval === '1P')!.fret
-  for (const pos of positions) {
-    while (pos.fret > rootFret + 4) pos.fret -= 12
-    while (pos.fret < rootFret - 4) pos.fret += 12
-  }
-
-  // If any fret < 1, shift all up by 12
-  if (positions.some(p => p.fret < 1)) {
-    for (const p of positions) p.fret += 12
-  }
 
   return positions
 }
