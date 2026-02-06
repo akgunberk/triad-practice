@@ -8,6 +8,7 @@ import FretboardDiagram from "./components/FretboardDiagram.vue";
 import QualitySelector from "./components/QualitySelector.vue";
 import StartStopButton from "./components/StartStopButton.vue";
 import ThreeVisualizer from "./components/ThreeVisualizer.vue";
+import TriadCheatsheet from "./components/TriadCheatsheet.vue";
 import { useMetronome } from "./composables/useMetronome";
 import {
   generateRandomChord,
@@ -109,6 +110,7 @@ function toggleMetronome() {
 
 <template>
   <ThreeVisualizer :is-running="isRunning" :current-beat="currentBeat" />
+  <TriadCheatsheet :selected-types="selectedTypes" />
   <div class="app-container">
     <h1 class="app-title">Chord Practicer</h1>
     <p class="app-subtitle">
@@ -155,6 +157,7 @@ function toggleMetronome() {
   align-items: center;
   gap: 12px;
   padding: 16px 16px;
+  padding-right: 256px;
   height: 100vh;
   box-sizing: border-box;
   overflow: hidden;
