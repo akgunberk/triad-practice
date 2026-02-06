@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed, watch } from "vue";
 import NoteSelector from "./components/NoteSelector.vue";
 import TempoSlider from "./components/TempoSlider.vue";
 import BeatDisplay from "./components/BeatDisplay.vue";
@@ -8,6 +8,7 @@ import FretboardDiagram from "./components/FretboardDiagram.vue";
 import QualitySelector from "./components/QualitySelector.vue";
 import StartStopButton from "./components/StartStopButton.vue";
 import ThreeVisualizer from "./components/ThreeVisualizer.vue";
+import CircleModeSelector from "./components/CircleModeSelector.vue";
 import { useMetronome } from "./composables/useMetronome";
 import {
   generateRandomChord,
@@ -24,6 +25,11 @@ import {
 import { pickRandomShape, type ShapeName } from "./utils/triadShapes";
 import type { TriadType } from "./utils/notes";
 import { Scale } from "tonal";
+import {
+  getCircleOfFifthsProgression,
+  getNextChordInCircle,
+  type CircleDirection,
+} from "./utils/circleOfFifths";
 
 const selectedNotes = ref<string[]>(Scale.get("c chromatic").notes);
 const selectedTypes = ref<TriadType[]>(["Major", "Minor", "Dim"]);
@@ -34,6 +40,21 @@ const instrumentReady = ref(false);
 const displayChord = ref<Chord | null>(null);
 const displayShape = ref<ShapeName | null>(null);
 let isFirstBeat = false;
+
+// Circle of Fifths mode
+const isCircleMode = ref(false);
+const circleDirection = ref<CircleDirection>("right");
+const circleProgression = computed(() =>
+  getCircleOfFifthsProgression(circleDirection.value, selectedTypes.value)
+);
+
+// Reset circle progression when direction or types change
+watch([circleDirection, selectedTypes], () => {
+  if (isCircleMode.value && !isRunning.value) {
+    currentChord.value = null;
+    displayChord.value = null;
+  }
+});
 
 onMounted(async () => {
   await initInstrument();
@@ -50,7 +71,7 @@ function handleMetronomeClick(isBeat1: boolean) {
 }
 
 function handleChordTrigger(shouldPlay: boolean) {
-  if (selectedNotes.value.length === 0) return;
+  if (!isCircleMode.value && selectedNotes.value.length === 0) return;
 
   if (shouldPlay) {
     // Beat 4: play audio for the already-displayed chord
@@ -67,11 +88,20 @@ function handleChordTrigger(shouldPlay: boolean) {
 
     // Only generate new chord on beat 1 if NOT the first beat
     if (!isFirstBeat) {
-      displayChord.value = generateRandomChord(
-        selectedNotes.value,
-        currentChord.value ?? undefined,
-        selectedTypes.value,
-      );
+      if (isCircleMode.value) {
+        // Circle mode: get next chord in progression
+        displayChord.value = getNextChordInCircle(
+          displayChord.value ?? undefined,
+          circleProgression.value
+        );
+      } else {
+        // Random mode: generate random chord
+        displayChord.value = generateRandomChord(
+          selectedNotes.value,
+          currentChord.value ?? undefined,
+          selectedTypes.value,
+        );
+      }
       displayShape.value = pickRandomShape(displayShape.value ?? undefined);
     } else {
       isFirstBeat = false;
@@ -95,11 +125,20 @@ function toggleMetronome() {
   } else {
     currentChord.value = null;
     // Generate first chord+shape before countdown
-    displayChord.value = generateRandomChord(
-      selectedNotes.value,
-      undefined,
-      selectedTypes.value
-    );
+    if (isCircleMode.value) {
+      // Circle mode: start from the first chord in progression
+      displayChord.value = getNextChordInCircle(
+        undefined,
+        circleProgression.value
+      );
+    } else {
+      // Random mode: generate random chord
+      displayChord.value = generateRandomChord(
+        selectedNotes.value,
+        undefined,
+        selectedTypes.value
+      );
+    }
     displayShape.value = pickRandomShape(undefined);
     isFirstBeat = true;
     start();
@@ -117,6 +156,13 @@ function toggleMetronome() {
     </p>
 
     <div class="controls-section">
+      <CircleModeSelector 
+        v-model:circle-mode="isCircleMode" 
+        v-model:direction="circleDirection"
+      />
+    </div>
+
+    <div class="controls-section" v-if="!isCircleMode">
       <NoteSelector v-model="selectedNotes" />
     </div>
 
@@ -140,8 +186,11 @@ function toggleMetronome() {
     </div>
 
     <div class="controls-section">
-      <StartStopButton :is-running="isRunning" :disabled="selectedNotes.length === 0 || !instrumentReady"
-        @toggle="toggleMetronome" />
+      <StartStopButton 
+        :is-running="isRunning" 
+        :disabled="(!isCircleMode && selectedNotes.length === 0) || !instrumentReady"
+        @toggle="toggleMetronome" 
+      />
     </div>
   </div>
 </template>
