@@ -1,17 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from "vue";
-import NoteSelector from "./components/NoteSelector.vue";
-import TempoSlider from "./components/TempoSlider.vue";
 import BeatDisplay from "./components/BeatDisplay.vue";
 import ChordDisplay from "./components/ChordDisplay.vue";
 import FretboardDiagram from "./components/FretboardDiagram.vue";
-import QualitySelector from "./components/QualitySelector.vue";
-import StartStopButton from "./components/StartStopButton.vue";
 import ThreeVisualizer from "./components/ThreeVisualizer.vue";
-import StringSetSelector from "./components/StringSetSelector.vue";
-import CircleModeSelector from "./components/CircleModeSelector.vue";
-import ProgressionSelector from "./components/ProgressionSelector.vue";
-import KeySelector from "./components/KeySelector.vue";
+import AppSidebar from "./components/AppSidebar.vue";
+import type { AppMode, ProgressionType } from "./components/AppSidebar.vue";
 import { useMetronome } from "./composables/useMetronome";
 import {
   generateRandomChord,
@@ -42,28 +36,43 @@ import {
   type CircleDirection,
 } from "./utils/circleOfFifths";
 
+// Sidebar state
+const appMode = ref<AppMode>("random");
 const selectedNotes = ref<string[]>(Scale.get("c chromatic").notes.slice(0, 1));
 const selectedTypes = ref<TriadType[]>(["Major", "Minor", "Dim"]);
 const selectedStringSets = ref<StringSet[]>(["I"]);
-const progressionMode = ref<ProgressionMode>("random");
+const progressionType = ref<ProgressionType>("I-IV-V");
 const progressionKey = ref<string>("C");
+const circleDirection = ref<CircleDirection>("right");
+
+// Internal state
 const progressionIndex = ref<number>(0);
 const currentChord = ref<Chord | null>(null);
 const currentShape = ref<ShapeName | null>(null);
 const currentStringSet = ref<StringSet>("I");
 const instrumentReady = ref(false);
-// The chord that is currently displayed (preview for upcoming beat 4)
 const displayChord = ref<Chord | null>(null);
 const displayShape = ref<ShapeName | null>(null);
 const displayStringSet = ref<StringSet>("I");
 let isFirstBeat = false;
 
-// Circle of Fifths mode
-const isCircleMode = ref(false);
-const circleDirection = ref<CircleDirection>("right");
+// Derived state bridging new appMode to old logic
+const isCircleMode = computed(() => appMode.value === "circle");
+const isProgressionMode = computed(() => appMode.value === "progression");
+const progressionMode = computed<ProgressionMode>(() =>
+  appMode.value === "progression" ? progressionType.value : "random",
+);
+
 const circleProgression = computed(() =>
   getCircleOfFifthsProgression(circleDirection.value, selectedTypes.value),
 );
+
+const canStart = computed(() => {
+  if (!instrumentReady.value) return false;
+  if (appMode.value === "random" && selectedNotes.value.length === 0)
+    return false;
+  return true;
+});
 
 // Reset circle progression when direction or types change
 watch([circleDirection, selectedTypes], () => {
@@ -73,19 +82,14 @@ watch([circleDirection, selectedTypes], () => {
   }
 });
 
-const isProgressionMode = computed(() => progressionMode.value !== "random");
-
 onMounted(async () => {
   await initInstrument();
   instrumentReady.value = true;
 });
 
-function handleBeat(_beat: number) {
-  // Display beat (handled by BeatDisplay component)
-}
+function handleBeat(_beat: number) {}
 
 function handleMetronomeClick(isBeat1: boolean) {
-  // Play metronome click sound
   playMetronomeClick(isBeat1);
 }
 
@@ -98,7 +102,6 @@ function handleChordTrigger(shouldPlay: boolean) {
     return;
 
   if (shouldPlay) {
-    // Beat 4: play audio for the already-displayed chord
     if (displayChord.value) {
       currentChord.value = displayChord.value;
       currentShape.value = displayShape.value;
@@ -107,20 +110,16 @@ function handleChordTrigger(shouldPlay: boolean) {
       playChordSound(noteNames);
     }
   } else {
-    // Beat 1: fade out previous audio
     const beatInterval = 60000 / bpm.value;
     fadeOutChord(beatInterval);
 
-    // Only generate new chord on beat 1 if NOT the first beat
     if (!isFirstBeat) {
       if (isCircleMode.value) {
-        // Circle mode: get next chord in progression
         displayChord.value = getNextChordInCircle(
           displayChord.value ?? undefined,
           circleProgression.value,
         );
       } else if (isProgressionMode.value) {
-        // Progression mode: get next chord in progression
         progressionIndex.value = (progressionIndex.value + 1) % 3;
         const progressionState: ProgressionState = {
           mode: progressionMode.value as Exclude<ProgressionMode, "random">,
@@ -129,7 +128,6 @@ function handleChordTrigger(shouldPlay: boolean) {
         };
         displayChord.value = getProgressionChord(progressionState);
       } else {
-        // Random mode: generate random chord
         displayChord.value = generateRandomChord(
           selectedNotes.value,
           currentChord.value ?? undefined,
@@ -160,9 +158,7 @@ function toggleMetronome() {
   } else {
     currentChord.value = null;
     progressionIndex.value = 0;
-    // Generate first chord+shape+stringSet before countdown
     if (isCircleMode.value) {
-      // Circle mode: start from the first chord in progression
       displayChord.value = getNextChordInCircle(
         undefined,
         circleProgression.value,
@@ -175,7 +171,6 @@ function toggleMetronome() {
       };
       displayChord.value = getProgressionChord(progressionState);
     } else {
-      // Random mode: generate random chord
       displayChord.value = generateRandomChord(
         selectedNotes.value,
         undefined,
@@ -193,44 +188,22 @@ function toggleMetronome() {
 <template>
   <ThreeVisualizer :is-running="isRunning" :current-beat="currentBeat" />
 
-  <!-- <TriadCheatsheet  :selected-types="selectedTypes" /> -->
+  <AppSidebar
+    v-model:app-mode="appMode"
+    v-model:circle-direction="circleDirection"
+    v-model:progression-type="progressionType"
+    v-model:progression-key="progressionKey"
+    v-model:selected-notes="selectedNotes"
+    v-model:selected-types="selectedTypes"
+    v-model:selected-string-sets="selectedStringSets"
+    v-model:bpm="bpm"
+    :is-running="isRunning"
+    :can-start="canStart"
+    @toggle="toggleMetronome"
+  />
+
   <div class="app-container">
     <h1 class="app-title">Chord Practicer</h1>
-    <p class="app-subtitle">
-      Select the notes you want to practice — random triads will be shown on
-      each beat.
-    </p>
-
-    <div class="controls-section">
-      <CircleModeSelector
-        v-model:circle-mode="isCircleMode"
-        v-model:direction="circleDirection"
-      />
-    </div>
-
-    <div class="controls-section" v-if="!isCircleMode">
-      <ProgressionSelector v-model="progressionMode" />
-    </div>
-
-    <div class="controls-section" v-if="!isCircleMode && isProgressionMode">
-      <KeySelector v-model="progressionKey" />
-    </div>
-
-    <div class="controls-section" v-if="!isCircleMode && !isProgressionMode">
-      <NoteSelector v-model="selectedNotes" />
-    </div>
-
-    <div class="controls-section" v-if="!isCircleMode && !isProgressionMode">
-      <QualitySelector v-model="selectedTypes" />
-    </div>
-
-    <div class="controls-section">
-      <StringSetSelector v-model="selectedStringSets" />
-    </div>
-
-    <div class="controls-row">
-      <TempoSlider v-model="bpm" />
-    </div>
 
     <div class="main-display">
       <div v-if="countdown > 0" class="countdown">{{ countdown }}</div>
@@ -246,17 +219,6 @@ function toggleMetronome() {
       </template>
       <BeatDisplay :current-beat="currentBeat" />
     </div>
-
-    <div class="controls-section">
-      <StartStopButton
-        :is-running="isRunning"
-        :disabled="
-          (!isCircleMode && !isProgressionMode && selectedNotes.length === 0) ||
-          !instrumentReady
-        "
-        @toggle="toggleMetronome"
-      />
-    </div>
   </div>
 </template>
 
@@ -267,12 +229,10 @@ function toggleMetronome() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 16px 16px;
-  padding-right: 256px;
+  gap: 16px;
+  padding: 24px 16px;
   height: 100vh;
   box-sizing: border-box;
-  /* overflow: hidden; */
 }
 
 .app-title {
@@ -282,28 +242,6 @@ function toggleMetronome() {
   letter-spacing: 0.15em;
   text-transform: uppercase;
   margin: 0;
-}
-
-.app-subtitle {
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.3);
-  margin: -20px 0 0;
-  max-width: 400px;
-  line-height: 1.4;
-}
-
-.controls-section {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-}
-
-.controls-row {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
 }
 
 .main-display {
