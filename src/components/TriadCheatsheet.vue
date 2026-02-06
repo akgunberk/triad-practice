@@ -50,7 +50,8 @@ async function renderShapes() {
       container.innerHTML = ''
       
       // Use C as reference note for display (doesn't matter which note)
-      const positions = calculateFretPositions('C', type, shape)
+      // Use string set I for the cheatsheet display
+      const positions = calculateFretPositions('C', type, shape, 'I')
       
       const minFret = Math.min(...positions.map(p => p.fret))
       const maxFret = Math.max(...positions.map(p => p.fret))

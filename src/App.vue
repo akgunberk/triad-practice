@@ -11,11 +11,16 @@ import ThreeVisualizer from "./components/ThreeVisualizer.vue";
 import TriadCheatsheet from "./components/TriadCheatsheet.vue";
 import StringSetSelector from "./components/StringSetSelector.vue";
 import CircleModeSelector from "./components/CircleModeSelector.vue";
+import ProgressionSelector from "./components/ProgressionSelector.vue";
+import KeySelector from "./components/KeySelector.vue";
 import { useMetronome } from "./composables/useMetronome";
 import {
   generateRandomChord,
   getChordNoteNames,
+  getProgressionChord,
   type Chord,
+  type ProgressionMode,
+  type ProgressionState,
 } from "./utils/chordGenerator";
 import {
   initInstrument,
@@ -36,6 +41,9 @@ import {
 const selectedNotes = ref<string[]>(Scale.get("c chromatic").notes);
 const selectedTypes = ref<TriadType[]>(["Major", "Minor", "Dim"]);
 const selectedStringSets = ref<StringSet[]>(["I"]);
+const progressionMode = ref<ProgressionMode>("random");
+const progressionKey = ref<string>("C");
+const progressionIndex = ref<number>(0);
 const currentChord = ref<Chord | null>(null);
 const currentShape = ref<ShapeName | null>(null);
 const currentStringSet = ref<StringSet>("I");
@@ -61,6 +69,8 @@ watch([circleDirection, selectedTypes], () => {
   }
 });
 
+const isProgressionMode = computed(() => progressionMode.value !== "random");
+
 onMounted(async () => {
   await initInstrument();
   instrumentReady.value = true;
@@ -76,7 +86,7 @@ function handleMetronomeClick(isBeat1: boolean) {
 }
 
 function handleChordTrigger(shouldPlay: boolean) {
-  if (!isCircleMode.value && selectedNotes.value.length === 0) return;
+  if (!isCircleMode.value && !isProgressionMode.value && selectedNotes.value.length === 0) return;
 
   if (shouldPlay) {
     // Beat 4: play audio for the already-displayed chord
@@ -94,31 +104,31 @@ function handleChordTrigger(shouldPlay: boolean) {
 
     // Only generate new chord on beat 1 if NOT the first beat
     if (!isFirstBeat) {
-<<<<<<< HEAD
-      displayChord.value = generateRandomChord(
-        selectedNotes.value,
-        currentChord.value ?? undefined,
-        selectedTypes.value,
-      );
-      displayStringSet.value = pickRandomStringSet(selectedStringSets.value);
-      displayShape.value = pickRandomShape(displayStringSet.value, displayShape.value ?? undefined);
-=======
       if (isCircleMode.value) {
         // Circle mode: get next chord in progression
         displayChord.value = getNextChordInCircle(
           displayChord.value ?? undefined,
           circleProgression.value
         );
+      } else if (isProgressionMode.value) {
+        // Progression mode: get next chord in progression
+        progressionIndex.value = (progressionIndex.value + 1) % 3;
+        const progressionState: ProgressionState = {
+          mode: progressionMode.value as Exclude<ProgressionMode, "random">,
+          key: progressionKey.value,
+          currentIndex: progressionIndex.value,
+        };
+        displayChord.value = getProgressionChord(progressionState);
       } else {
         // Random mode: generate random chord
         displayChord.value = generateRandomChord(
           selectedNotes.value,
           currentChord.value ?? undefined,
-          selectedTypes.value,
+          selectedTypes.value
         );
       }
-      displayShape.value = pickRandomShape(displayShape.value ?? undefined);
->>>>>>> circle-mode
+      displayStringSet.value = pickRandomStringSet(selectedStringSets.value);
+      displayShape.value = pickRandomShape(displayStringSet.value, displayShape.value ?? undefined);
     } else {
       isFirstBeat = false;
     }
@@ -140,23 +150,21 @@ function toggleMetronome() {
     displayShape.value = null;
   } else {
     currentChord.value = null;
-<<<<<<< HEAD
+    progressionIndex.value = 0;
     // Generate first chord+shape+stringSet before countdown
-    displayChord.value = generateRandomChord(
-      selectedNotes.value,
-      undefined,
-      selectedTypes.value
-    );
-    displayStringSet.value = pickRandomStringSet(selectedStringSets.value);
-    displayShape.value = pickRandomShape(displayStringSet.value, undefined);
-=======
-    // Generate first chord+shape before countdown
     if (isCircleMode.value) {
       // Circle mode: start from the first chord in progression
       displayChord.value = getNextChordInCircle(
         undefined,
         circleProgression.value
       );
+    } else if (isProgressionMode.value) {
+      const progressionState: ProgressionState = {
+        mode: progressionMode.value as Exclude<ProgressionMode, "random">,
+        key: progressionKey.value,
+        currentIndex: 0,
+      };
+      displayChord.value = getProgressionChord(progressionState);
     } else {
       // Random mode: generate random chord
       displayChord.value = generateRandomChord(
@@ -165,8 +173,8 @@ function toggleMetronome() {
         selectedTypes.value
       );
     }
-    displayShape.value = pickRandomShape(undefined);
->>>>>>> circle-mode
+    displayStringSet.value = pickRandomStringSet(selectedStringSets.value);
+    displayShape.value = pickRandomShape(displayStringSet.value, undefined);
     isFirstBeat = true;
     start();
   }
@@ -191,10 +199,18 @@ function toggleMetronome() {
     </div>
 
     <div class="controls-section" v-if="!isCircleMode">
+      <ProgressionSelector v-model="progressionMode" />
+    </div>
+
+    <div class="controls-section" v-if="!isCircleMode && isProgressionMode">
+      <KeySelector v-model="progressionKey" />
+    </div>
+
+    <div class="controls-section" v-if="!isCircleMode && !isProgressionMode">
       <NoteSelector v-model="selectedNotes" />
     </div>
 
-    <div class="controls-section">
+    <div class="controls-section" v-if="!isCircleMode && !isProgressionMode">
       <QualitySelector v-model="selectedTypes" />
     </div>
 
@@ -218,10 +234,12 @@ function toggleMetronome() {
     </div>
 
     <div class="controls-section">
-      <StartStopButton 
-        :is-running="isRunning" 
-        :disabled="(!isCircleMode && selectedNotes.length === 0) || !instrumentReady"
-        @toggle="toggleMetronome" 
+      <StartStopButton
+        :is-running="isRunning"
+        :disabled="
+          (!isCircleMode && !isProgressionMode && selectedNotes.length === 0) || !instrumentReady
+        "
+        @toggle="toggleMetronome"
       />
     </div>
   </div>
