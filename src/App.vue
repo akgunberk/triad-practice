@@ -9,7 +9,7 @@ import ThreeVisualizer from './components/ThreeVisualizer.vue'
 import InstrumentPicker from './components/InstrumentPicker.vue'
 import { useMetronome } from './composables/useMetronome'
 import { generateRandomChord, getChordNoteNames, type Chord } from './utils/chordGenerator'
-import { initInstrument, playChordSound, stopChordSound } from './utils/audio'
+import { initInstrument, playChordSound, stopChordSound, playMetronomeClick, fadeOutChord } from './utils/audio'
 
 const selectedNotes = ref<string[]>([])
 const currentChord = ref<Chord | null>(null)
@@ -20,18 +20,38 @@ onMounted(async () => {
   instrumentReady.value = true
 })
 
-function handleBeat(beat: number) {
-  if (beat === 1 && selectedNotes.value.length > 0) {
+function handleBeat(_beat: number) {
+  // Display beat (handled by BeatDisplay component)
+}
+
+function handleMetronomeClick(isBeat1: boolean) {
+  // Play metronome click sound
+  playMetronomeClick(isBeat1)
+}
+
+function handleChordTrigger(shouldPlay: boolean) {
+  if (selectedNotes.value.length === 0) return
+
+  if (shouldPlay) {
+    // Beat 4: play new chord
     currentChord.value = generateRandomChord(
       selectedNotes.value,
       currentChord.value ?? undefined
     )
     const noteNames = getChordNoteNames(currentChord.value)
     playChordSound(noteNames)
+  } else {
+    // Beat 1: fade out current chord over 1 beat duration
+    const beatInterval = 60000 / bpm.value
+    fadeOutChord(beatInterval)
   }
 }
 
-const { bpm, currentBeat, isRunning, countdown, start, stop } = useMetronome(handleBeat)
+const { bpm, currentBeat, isRunning, countdown, start, stop } = useMetronome(
+  handleBeat,
+  handleMetronomeClick,
+  handleChordTrigger
+)
 
 function toggleMetronome() {
   if (isRunning.value) {

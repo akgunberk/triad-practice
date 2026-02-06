@@ -12,7 +12,6 @@
     "smplr": "^0.16.4",
     "three": "^0.182.0",
     "tonal": "^6.4.3",
-    "use-chromatone": "^3.0.2",
     "vue": "^3.5.24"
   },
   "devDependencies": {
