@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, computed } from "vue";
 import NoteSelector from "./components/NoteSelector.vue";
 import TempoSlider from "./components/TempoSlider.vue";
 import BeatDisplay from "./components/BeatDisplay.vue";
@@ -8,11 +8,16 @@ import FretboardDiagram from "./components/FretboardDiagram.vue";
 import QualitySelector from "./components/QualitySelector.vue";
 import StartStopButton from "./components/StartStopButton.vue";
 import ThreeVisualizer from "./components/ThreeVisualizer.vue";
+import ProgressionSelector from "./components/ProgressionSelector.vue";
+import KeySelector from "./components/KeySelector.vue";
 import { useMetronome } from "./composables/useMetronome";
 import {
   generateRandomChord,
   getChordNoteNames,
+  getProgressionChord,
   type Chord,
+  type ProgressionMode,
+  type ProgressionState,
 } from "./utils/chordGenerator";
 import {
   initInstrument,
@@ -27,6 +32,9 @@ import { Scale } from "tonal";
 
 const selectedNotes = ref<string[]>(Scale.get("c chromatic").notes);
 const selectedTypes = ref<TriadType[]>(["Major", "Minor", "Dim"]);
+const progressionMode = ref<ProgressionMode>("random");
+const progressionKey = ref<string>("C");
+const progressionIndex = ref<number>(0);
 const currentChord = ref<Chord | null>(null);
 const currentShape = ref<ShapeName | null>(null);
 const instrumentReady = ref(false);
@@ -34,6 +42,8 @@ const instrumentReady = ref(false);
 const displayChord = ref<Chord | null>(null);
 const displayShape = ref<ShapeName | null>(null);
 let isFirstBeat = false;
+
+const isProgressionMode = computed(() => progressionMode.value !== "random");
 
 onMounted(async () => {
   await initInstrument();
@@ -50,7 +60,8 @@ function handleMetronomeClick(isBeat1: boolean) {
 }
 
 function handleChordTrigger(shouldPlay: boolean) {
-  if (selectedNotes.value.length === 0) return;
+  if (progressionMode.value === "random" && selectedNotes.value.length === 0)
+    return;
 
   if (shouldPlay) {
     // Beat 4: play audio for the already-displayed chord
@@ -67,11 +78,23 @@ function handleChordTrigger(shouldPlay: boolean) {
 
     // Only generate new chord on beat 1 if NOT the first beat
     if (!isFirstBeat) {
-      displayChord.value = generateRandomChord(
-        selectedNotes.value,
-        currentChord.value ?? undefined,
-        selectedTypes.value,
-      );
+      if (isProgressionMode.value) {
+        // Progression mode: get next chord in progression
+        progressionIndex.value = (progressionIndex.value + 1) % 3;
+        const progressionState: ProgressionState = {
+          mode: progressionMode.value as Exclude<ProgressionMode, "random">,
+          key: progressionKey.value,
+          currentIndex: progressionIndex.value,
+        };
+        displayChord.value = getProgressionChord(progressionState);
+      } else {
+        // Random mode: generate random chord
+        displayChord.value = generateRandomChord(
+          selectedNotes.value,
+          currentChord.value ?? undefined,
+          selectedTypes.value
+        );
+      }
       displayShape.value = pickRandomShape(displayShape.value ?? undefined);
     } else {
       isFirstBeat = false;
@@ -94,12 +117,22 @@ function toggleMetronome() {
     displayShape.value = null;
   } else {
     currentChord.value = null;
+    progressionIndex.value = 0;
     // Generate first chord+shape before countdown
-    displayChord.value = generateRandomChord(
-      selectedNotes.value,
-      undefined,
-      selectedTypes.value
-    );
+    if (isProgressionMode.value) {
+      const progressionState: ProgressionState = {
+        mode: progressionMode.value as Exclude<ProgressionMode, "random">,
+        key: progressionKey.value,
+        currentIndex: 0,
+      };
+      displayChord.value = getProgressionChord(progressionState);
+    } else {
+      displayChord.value = generateRandomChord(
+        selectedNotes.value,
+        undefined,
+        selectedTypes.value
+      );
+    }
     displayShape.value = pickRandomShape(undefined);
     isFirstBeat = true;
     start();
@@ -117,10 +150,18 @@ function toggleMetronome() {
     </p>
 
     <div class="controls-section">
+      <ProgressionSelector v-model="progressionMode" />
+    </div>
+
+    <div class="controls-section" v-if="isProgressionMode">
+      <KeySelector v-model="progressionKey" />
+    </div>
+
+    <div class="controls-section" v-if="!isProgressionMode">
       <NoteSelector v-model="selectedNotes" />
     </div>
 
-    <div class="controls-section">
+    <div class="controls-section" v-if="!isProgressionMode">
       <QualitySelector v-model="selectedTypes" />
     </div>
 
@@ -140,8 +181,13 @@ function toggleMetronome() {
     </div>
 
     <div class="controls-section">
-      <StartStopButton :is-running="isRunning" :disabled="selectedNotes.length === 0 || !instrumentReady"
-        @toggle="toggleMetronome" />
+      <StartStopButton
+        :is-running="isRunning"
+        :disabled="
+          (!isProgressionMode && selectedNotes.length === 0) || !instrumentReady
+        "
+        @toggle="toggleMetronome"
+      />
     </div>
   </div>
 </template>
