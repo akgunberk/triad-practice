@@ -38,7 +38,7 @@ import {
 
 // Sidebar state
 const appMode = ref<AppMode>("random");
-const selectedNotes = ref<string[]>(Scale.get("c chromatic").notes.slice(0, 1));
+const selectedNotes = ref<string[]>(Scale.get("c chromatic").notes);
 const selectedTypes = ref<TriadType[]>(["Major", "Minor", "Dim"]);
 const selectedStringSets = ref<StringSet[]>(["I"]);
 const progressionType = ref<ProgressionType>("I-IV-V");

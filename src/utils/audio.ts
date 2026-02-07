@@ -7,7 +7,7 @@ let analyser: AnalyserNode | null = null
 let dataArray: Uint8Array | null = null
 let soundfont: Soundfont | null = null
 let isLoaded = false
-let currentInstrumentName = 'string_ensemble_1'
+let currentInstrumentName = 'acoustic_guitar_nylon'
 
 let chordGainNode: GainNode | null = null
 let chordFadeTimeout: ReturnType<typeof setTimeout> | null = null
